@@ -209,6 +209,30 @@ int main(int argc, char **argv)
       symd.add_symbol(stra, (char*)cro_data + symbol->offs_name, segments[seg_idx]->get_virtual_address() + seg_offs, 0, STB_GLOBAL, STT_NOTYPE, 0, sections[seg_idx]->get_index());
    }
    
+   for (int i = 0; i < cro_header->num_index_exports; i++)
+   {
+      CRO_Symbol* symbol = cro_header->get_index_export(cro_data, i);
+      int seg_idx = symbol->seg_offset & 0xf;
+      int seg_offs = symbol->seg_offset >> 4;
+      printf("index %x - %x %x\n", symbol->seg_offset, seg_idx, seg_offs);
+      
+      char name[32];
+      snprintf(name, 32, "export_index_%u", symbol->offs_name);
+      symd.add_symbol(stra, name, segments[seg_idx]->get_virtual_address() + seg_offs, 0, STB_GLOBAL, STT_NOTYPE, 0, sections[seg_idx]->get_index());
+   }
+   
+   for (int i = 0; i < cro_header->num_index_exports; i++)
+   {
+      CRO_Symbol* symbol = cro_header->get_index_export(cro_data, i);
+      int seg_idx = symbol->seg_offset & 0xf;
+      int seg_offs = symbol->seg_offset >> 4;
+      printf("index %x - %x %x\n", symbol->seg_offset, seg_idx, seg_offs);
+      
+      char name[32];
+      snprintf(name, 32, "import_index_%u", symbol->offs_name);
+      symd.add_symbol(stra, name, segments[seg_idx]->get_virtual_address() + seg_offs, 0, STB_GLOBAL, STT_NOTYPE, 0, sections[seg_idx]->get_index());
+   }
+   
    for (int i = 0; i < cro_header->num_symbol_imports; i++)
    {
       CRO_Symbol* symbol = cro_header->get_import(cro_data, i);
@@ -225,6 +249,60 @@ int main(int argc, char **argv)
          int rel_seg_offs = reloc->seg_offset >> 4;
          
          printf("rel %x %x %x %x\n", reloc->seg_offset, reloc->type, reloc->addend, reloc->last_entry);
+         
+         rel_accessors[rel_seg_idx]->add_entry(segments[rel_seg_idx]->get_virtual_address() + rel_seg_offs, index, reloc->type, reloc->addend);
+         
+         if (reloc->last_entry) break;
+         reloc++;
+      }
+   }
+   
+   for (int i = 0; i < cro_header->num_index_imports; i++)
+   {
+      CRO_Symbol* symbol = cro_header->get_index_import(cro_data, i);
+      uint32_t patch_offs = symbol->seg_offset;
+      
+      char name[32];
+      snprintf(name, 32, "import_index_%u", symbol->offs_name);
+      int index = symd.add_symbol(stra, name, 0x0, 0, STB_GLOBAL, STT_NOTYPE, 0, 0);
+      
+      if (!patch_offs) continue;
+      
+      CRO_Relocation* reloc = (CRO_Relocation*)((char*)cro_data + patch_offs);
+      while(1)
+      {
+         int rel_seg_idx = reloc->seg_offset & 0xf;
+         int rel_seg_offs = reloc->seg_offset >> 4;
+         
+         printf("rel index %x %x %x %x\n", reloc->seg_offset, reloc->type, reloc->addend, reloc->last_entry);
+         
+         rel_accessors[rel_seg_idx]->add_entry(segments[rel_seg_idx]->get_virtual_address() + rel_seg_offs, index, reloc->type, reloc->addend);
+         
+         if (reloc->last_entry) break;
+         reloc++;
+      }
+   }
+   
+   for (int i = 0; i < cro_header->num_offset_imports; i++)
+   {
+      CRO_Symbol* symbol = cro_header->get_offset_import(cro_data, i);
+      uint32_t patch_offs = symbol->seg_offset;
+      int seg_idx = symbol->offs_name & 0xf;
+      int seg_offs = symbol->offs_name >> 4;
+      
+      char name[32];
+      snprintf(name, 32, "offset_import_%x_%x", seg_idx, seg_offs);
+      int index = symd.add_symbol(stra, name, 0x0, 0, STB_GLOBAL, STT_NOTYPE, 0, 0);
+      
+      if (!patch_offs) continue;
+      
+      CRO_Relocation* reloc = (CRO_Relocation*)((char*)cro_data + patch_offs);
+      while(1)
+      {
+         int rel_seg_idx = reloc->seg_offset & 0xf;
+         int rel_seg_offs = reloc->seg_offset >> 4;
+         
+         printf("rel offset %x %x %x %x\n", reloc->seg_offset, reloc->type, reloc->addend, reloc->last_entry);
          
          rel_accessors[rel_seg_idx]->add_entry(segments[rel_seg_idx]->get_virtual_address() + rel_seg_offs, index, reloc->type, reloc->addend);
          

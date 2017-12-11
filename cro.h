@@ -98,9 +98,24 @@ typedef struct
       return (CRO_Relocation*)((char*)cro_data + offs_static_relocations + (index * sizeof(CRO_Relocation)));
    }
    
+   CRO_Symbol* get_index_export(void* cro_data, int index)
+   {
+      return (CRO_Symbol*)((char*)cro_data + offs_index_exports + (index * sizeof(CRO_Symbol)));
+   }
+   
    CRO_Symbol* get_export(void* cro_data, int index)
    {
       return (CRO_Symbol*)((char*)cro_data + offs_symbol_exports + (index * sizeof(CRO_Symbol)));
+   }
+   
+   CRO_Symbol* get_offset_import(void* cro_data, int index)
+   {
+      return (CRO_Symbol*)((char*)cro_data + offs_offset_imports + (index * sizeof(CRO_Symbol)));
+   }
+   
+   CRO_Symbol* get_index_import(void* cro_data, int index)
+   {
+      return (CRO_Symbol*)((char*)cro_data + offs_index_imports + (index * sizeof(CRO_Symbol)));
    }
    
    CRO_Symbol* get_import(void* cro_data, int index)
