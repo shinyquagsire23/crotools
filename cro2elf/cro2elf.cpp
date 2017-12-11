@@ -241,8 +241,8 @@ int main(int argc, char **argv)
       int ref_seg_idx = reloc->last_entry;
          
       printf("rel static %x %x %x %x\n", reloc->seg_offset, reloc->type, reloc->addend, reloc->last_entry);
-         
-      rel_accessors[rel_seg_idx]->add_entry(segments[rel_seg_idx]->get_virtual_address() + rel_seg_offs, ref_seg_idx, reloc->type, reloc->addend);
+
+      rel_accessors[rel_seg_idx]->add_entry(segments[rel_seg_idx]->get_virtual_address() + rel_seg_offs, ref_seg_idx, reloc->type, segments[ref_seg_idx]->get_virtual_address() + reloc->addend);
    }
    
    elf.save(argv[2]);
