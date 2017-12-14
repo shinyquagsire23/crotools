@@ -3,6 +3,8 @@
 
 #include <stdint.h>
 
+#define MAGIC_CRO0 (0x304F5243)
+
 enum CRO_Segment_Type
 {
    SEG_TEXT = 0,
@@ -23,6 +25,17 @@ typedef struct
    uint32_t offs_name;
    uint32_t seg_offset;
 } CRO_Symbol;
+
+typedef struct
+{
+   uint16_t test_bit;
+   union Child {
+      uint16_t raw;
+      uint16_t next_index;
+   } left, right;
+
+   uint16_t exportIndex;
+} CRO_ExportTreeEntry;
 
 typedef struct
 {
@@ -63,8 +76,8 @@ typedef struct
    uint32_t num_symbol_exports;
    uint32_t offs_index_exports;
    uint32_t num_index_exports;
-   uint32_t offs_export_symtab;
-   uint32_t num_export_symtab;
+   uint32_t offs_export_strtab;
+   uint32_t size_export_strtab;
    uint32_t offs_export_tree;
    uint32_t num_export_tree;
    
@@ -79,14 +92,16 @@ typedef struct
    uint32_t num_index_imports;
    uint32_t offs_offset_imports;
    uint32_t num_offset_imports;
-   uint32_t offs_import_symtab;
-   uint32_t num_import_symtab;
+   uint32_t offs_import_strtab;
+   uint32_t size_import_strtab;
    
    // Weird static stuff
    uint32_t offs_offset_exports;
    uint32_t num_offset_exports;
    uint32_t offs_static_relocations;
    uint32_t num_static_relocations;
+   uint32_t offs_unk;
+   uint32_t size_unk;
    
    CRO_Relocation* get_import_reloc(void* cro_data, int index)
    {
