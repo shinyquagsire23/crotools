@@ -123,18 +123,33 @@ int main(int argc, char **argv)
    
    // Push exported symbols
    symbol_section_accessor syma(elf, elf.sections[".dynsym"]);
+   
+   size_t count_exports = 0;
+   for (int i = 0; i < syma.get_symbols_num(); i++)
+   {
+      std::string name;
+      Elf64_Addr addr;
+      Elf_Xword size;
+      uint8_t bind, type, other;
+      Elf_Half section_index;
+      syma.get_symbol(i, name ,addr, size, bind, type, section_index, other);
+      
+      if (section_index != 0 && name != "")
+         count_exports++;
+   }
+   
    CRO_Symbol* exports = (CRO_Symbol*)((char*)cro_ctx.cro_data + cro_ctx.cro_size);
    cro_ctx.cro_header->offs_symbol_exports = cro_ctx.cro_size;
-   cro_ctx.cro_header->offs_index_exports = syma.get_symbols_num();
-   push_data(cro_ctx, NULL, sizeof(CRO_Symbol) * syma.get_symbols_num());
+   cro_ctx.cro_header->offs_index_exports = count_exports;
+   push_data(cro_ctx, NULL, sizeof(CRO_Symbol) * count_exports);
    
    // Push index exports (TODO)
    cro_ctx.cro_header->offs_index_exports = cro_ctx.cro_size;
-   cro_ctx.cro_header->num_index_exports = syma.get_symbols_num();
+   cro_ctx.cro_header->num_index_exports = 0;
    
    // Push export tree
    CRO_ExportTreeEntry* exportTree = (CRO_ExportTreeEntry*)((char*)cro_ctx.cro_data + cro_ctx.cro_size);
-   push_data(cro_ctx, NULL, sizeof(CRO_ExportTreeEntry) * syma.get_symbols_num());
+   push_data(cro_ctx, NULL, sizeof(CRO_ExportTreeEntry) * count_exports);
    
    size_t export_strtab_offset = cro_ctx.cro_size;
    size_t export_strtab_size;
