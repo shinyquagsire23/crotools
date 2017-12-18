@@ -204,27 +204,27 @@ int main(int argc, char **argv)
    // Push import data
    
    // Count up allocations
-   relocation_section_accessor relt(elf, elf.sections[".rela.text"]);
-   relocation_section_accessor relr(elf, elf.sections[".rela.rodata"]);
-   relocation_section_accessor reld(elf, elf.sections[".rela.data"]);
-   
-   relocation_section_accessor relocs[3] = {relt, relr, reld};
    
    size_t import_relocs_count = 0;
    size_t export_relocs_count = 0;
    
    // Count relocs
-   for (int j = 0; j < 3; j++)
+
+   for (int k = 0; k < elf.sections.size(); k++)
    {
-      for (int i = 0; i < relocs[j].get_entries_num(); i++)
+      section* sec = elf.sections[k];
+      if (sec->get_type() != SHT_RELA) continue;
+      
+      relocation_section_accessor rela(elf, sec);
+      for (int i = 0; i < rela.get_entries_num(); i++)
       {
          Elf64_Addr offset;
          Elf_Word symbol_idx;
          Elf_Word relType;
          Elf_Sxword addend;
 
-         relocs[j].get_entry(i, offset, symbol_idx, relType, addend);
-         
+         rela.get_entry(i, offset, symbol_idx, relType, addend);
+            
          ELF_Symbol symbol;
          ELF_get_symbol(syma, symbol_idx, symbol);
          
@@ -258,6 +258,7 @@ int main(int argc, char **argv)
    cro_ctx.cro_header->offs_import_strtab = cro_ctx.cro_size;
    cro_ctx.cro_header->size_import_strtab = import_strtab_size;
    push_data(cro_ctx, NULL, import_strtab_size);
+   cro_align_up(cro_ctx, 0x4);
    
    // Export offsets (TODO)
    cro_ctx.cro_header->offs_offset_exports = cro_ctx.cro_size;
@@ -276,17 +277,22 @@ int main(int argc, char **argv)
    CRO_Relocation* import_relocs = (CRO_Relocation*)((char*)cro_ctx.cro_data + cro_ctx.cro_header->offs_import_patches);
    CRO_Relocation* static_relocs = (CRO_Relocation*)((char*)cro_ctx.cro_data + cro_ctx.cro_header->offs_static_relocations);
    std::map<Elf_Word, int> symbol_to_patches;
-   for (int j = 0; j < 3; j++)
+
+   Elf_Word last_import_symbol_idx;
+   for (int k = 0; k < elf.sections.size(); k++)
    {
-      Elf_Word last_import_symbol_idx;
-      for (int i = 0; i < relocs[j].get_entries_num(); i++)
+      section* sec = elf.sections[k];
+      if (sec->get_type() != SHT_RELA) continue;
+
+      relocation_section_accessor rela(elf, sec);
+      for (int i = 0; i < rela.get_entries_num(); i++)
       {
          Elf64_Addr offset;
          Elf_Word symbol_idx;
          Elf_Word relType;
          Elf_Sxword addend;
 
-         relocs[j].get_entry(i, offset, symbol_idx, relType, addend);
+         rela.get_entry(i, offset, symbol_idx, relType, addend);
          
          ELF_Symbol symbol;
          ELF_get_symbol(syma, symbol_idx, symbol);
@@ -296,15 +302,15 @@ int main(int argc, char **argv)
             import_relocs[import_reloc_count].seg_offset = cro_addr_to_segment_addr(elf, offset);
             import_relocs[import_reloc_count].type = relType;
             import_relocs[import_reloc_count].last_entry = 1;
-            
+
             if (symbol_to_patches[symbol_idx] == 0)
                symbol_to_patches[symbol_idx] = import_reloc_count;
-            
+
             if (last_import_symbol_idx == symbol_idx)
                import_relocs[import_reloc_count-1].last_entry = 0;
-            
+
             import_relocs[import_reloc_count++].addend = addend;
-            
+
             last_import_symbol_idx = symbol_idx;
             printf("%x %x\n", last_import_symbol_idx, symbol_idx);
          }
@@ -314,7 +320,7 @@ int main(int argc, char **argv)
             static_relocs[static_reloc_count].type = relType;
             static_relocs[static_reloc_count].last_entry = symbol_idx;
             static_relocs[static_reloc_count].addend = addend - elf.segments[symbol_idx]->get_virtual_address();
-            
+
             static_reloc_count++;
          }
       }
@@ -375,14 +381,14 @@ int main(int argc, char **argv)
    cro_ctx.cro_header->size_text = text_total_size;
    cro_ctx.cro_header->offs_data = segment_start[SEG_DATA];
    
-   cro_ctx.cro_header->size_bss = segment_size[SEG_BSS];
+   cro_ctx.cro_header->size_bss = elf.sections[".bss"]->get_size();
 
    CRO_Segment* cro_segments = (CRO_Segment*)((char*)cro_ctx.cro_data + cro_ctx.cro_header->offs_segments);
    for (int i = 0; i < cro_ctx.cro_header->num_segments; i++)
    {
       CRO_Segment* segment = &cro_segments[i];
       segment->offset = segment_start[i];
-      segment->size = segment_size[i];
+      segment->size = elf.segments[i]->get_memory_size();
       segment->type = i;
       
       // CRO header segment(?)
