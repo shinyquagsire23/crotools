@@ -6,6 +6,24 @@
 
 using namespace ELFIO;
 
+int counts[3] = {0};
+section* add_relocation_section(elfio& elf, section** sections, section* dynsym_sec, int segment_index)
+{
+   char* secs[3] = {".text", ".rodata", ".data"};
+   char rela_name[32];
+   snprintf(rela_name, 32, ".rela%s.%u", secs[segment_index], counts[segment_index]++);
+   
+   section* rel_sec = elf.sections.add(rela_name);
+   rel_sec->set_type(SHT_RELA);
+   rel_sec->set_entry_size(elf.get_default_entry_size(SHT_RELA));
+   rel_sec->set_flags(SHF_ALLOC | SHF_INFO_LINK);
+   rel_sec->set_info(sections[segment_index]->get_index());
+   rel_sec->set_overlay(sections[segment_index]->get_index());
+   rel_sec->set_link(dynsym_sec->get_index());
+   rel_sec->set_addr_align(4);
+   return rel_sec;
+}
+
 int main(int argc, char **argv)
 {
    if (argc < 3)
@@ -127,10 +145,18 @@ int main(int argc, char **argv)
          sec->set_type(SHT_NULL);
       }
       
-      if (cro_segments[i].type != SEG_BSS)
-         sec->set_address(cro_segments[i].offset);
       sec->set_addr_align(4);
-      sec->set_data((char*)cro_data + cro_segments[i].offset, cro_segments[i].size);
+      if (cro_segments[i].type != SEG_BSS)
+      {
+         sec->set_address(cro_segments[i].offset);
+         sec->set_data((char*)cro_data + cro_segments[i].offset, cro_segments[i].size);
+      }
+      else
+      {
+         sec->set_size(cro_header->size_bss);
+         seg->set_memory_size(cro_segments[i].size);
+         seg->set_file_size(cro_segments[i].size);
+      }
       seg->add_section_index(sec->get_index(), sec->get_addr_align());
       
       sections[i] = sec;
@@ -164,47 +190,15 @@ int main(int argc, char **argv)
       symd.add_symbol(0, segments[i]->get_virtual_address(), 0, STB_LOCAL, STT_SECTION, 0, sections[i]->get_index());
    }
    
-   section* text_rel_sec = elf.sections.add(".rela.text");
-   text_rel_sec->set_type(SHT_RELA);
-   text_rel_sec->set_entry_size(elf.get_default_entry_size(SHT_RELA));
-   text_rel_sec->set_flags(SHF_ALLOC | SHF_INFO_LINK);
-   text_rel_sec->set_info(sections[SEG_TEXT]->get_index());
-   text_rel_sec->set_overlay(sections[SEG_TEXT]->get_index());
-   text_rel_sec->set_link(dynsym_sec->get_index());
-   text_rel_sec->set_addr_align(4);
-   relocation_section_accessor relt(elf, text_rel_sec);
-   
-   section* rodata_rel_sec = elf.sections.add(".rela.rodata");
-   rodata_rel_sec->set_type(SHT_RELA);
-   rodata_rel_sec->set_entry_size(elf.get_default_entry_size(SHT_RELA));
-   rodata_rel_sec->set_flags(SHF_ALLOC | SHF_INFO_LINK);
-   rodata_rel_sec->set_info(sections[SEG_RODATA]->get_index());
-   rodata_rel_sec->set_overlay(sections[SEG_RODATA]->get_index());
-   rodata_rel_sec->set_link(dynsym_sec->get_index());
-   rodata_rel_sec->set_addr_align(4);
-   relocation_section_accessor relr(elf, rodata_rel_sec);
-   
-   section* data_rel_sec = elf.sections.add(".rela.data");
-   data_rel_sec->set_type(SHT_RELA);
-   data_rel_sec->set_entry_size(elf.get_default_entry_size(SHT_RELA));
-   data_rel_sec->set_flags(SHF_ALLOC | SHF_INFO_LINK);
-   data_rel_sec->set_info(sections[SEG_DATA]->get_index());
-   data_rel_sec->set_overlay(sections[SEG_DATA]->get_index());
-   data_rel_sec->set_link(dynsym_sec->get_index());
-   data_rel_sec->set_addr_align(4);
-   relocation_section_accessor reld(elf, data_rel_sec);
-   
-   relocation_section_accessor* rel_accessors[3];
-   rel_accessors[SEG_TEXT] = &relt;
-   rel_accessors[SEG_RODATA] = &relr;
-   rel_accessors[SEG_DATA] = &reld;
+   int last_rela = -1;
+   relocation_section_accessor* rel_accessor = nullptr;
    
    for (int i = 0; i < cro_header->num_symbol_exports; i++)
    {
       CRO_Symbol* symbol = cro_header->get_export(cro_data, i);
       int seg_idx = symbol->seg_offset & 0xf;
       int seg_offs = symbol->seg_offset >> 4;
-      printf("%x - %x %x\n", symbol->seg_offset, seg_idx, seg_offs);
+      //printf("%x - %x %x\n", symbol->seg_offset, seg_idx, seg_offs);
       
       symd.add_symbol(stra, (char*)cro_data + symbol->offs_name, segments[seg_idx]->get_virtual_address() + seg_offs, 0, STB_GLOBAL, STT_NOTYPE, 0, sections[seg_idx]->get_index());
    }
@@ -214,7 +208,7 @@ int main(int argc, char **argv)
       CRO_Symbol* symbol = cro_header->get_index_export(cro_data, i);
       int seg_idx = symbol->seg_offset & 0xf;
       int seg_offs = symbol->seg_offset >> 4;
-      printf("index %x - %x %x\n", symbol->seg_offset, seg_idx, seg_offs);
+      //printf("index %x - %x %x\n", symbol->seg_offset, seg_idx, seg_offs);
       
       char name[32];
       snprintf(name, 32, "export_index_%u", symbol->offs_name);
@@ -226,7 +220,7 @@ int main(int argc, char **argv)
       CRO_Symbol* symbol = cro_header->get_index_export(cro_data, i);
       int seg_idx = symbol->seg_offset & 0xf;
       int seg_offs = symbol->seg_offset >> 4;
-      printf("index %x - %x %x\n", symbol->seg_offset, seg_idx, seg_offs);
+      //printf("index %x - %x %x\n", symbol->seg_offset, seg_idx, seg_offs);
       
       char name[32];
       snprintf(name, 32, "import_index_%u", symbol->offs_name);
@@ -248,9 +242,16 @@ int main(int argc, char **argv)
          int rel_seg_idx = reloc->seg_offset & 0xf;
          int rel_seg_offs = reloc->seg_offset >> 4;
          
-         printf("rel %x %x %x %x\n", reloc->seg_offset, reloc->type, reloc->addend, reloc->last_entry);
+         //printf("rel %x %x %x %x\n", reloc->seg_offset, reloc->type, reloc->addend, reloc->last_entry);
          
-         rel_accessors[rel_seg_idx]->add_entry(segments[rel_seg_idx]->get_virtual_address() + rel_seg_offs, index, reloc->type, reloc->addend);
+         if (last_rela != rel_seg_idx)
+         {
+            if (rel_accessor != nullptr)
+               delete rel_accessor;
+            rel_accessor = new relocation_section_accessor(elf, add_relocation_section(elf, sections, dynsym_sec, rel_seg_idx));
+         }
+         rel_accessor->add_entry(segments[rel_seg_idx]->get_virtual_address() + rel_seg_offs, index, reloc->type, reloc->addend);
+         last_rela = rel_seg_idx;
          
          if (reloc->last_entry) break;
          reloc++;
@@ -276,7 +277,14 @@ int main(int argc, char **argv)
          
          printf("rel index %x %x %x %x\n", reloc->seg_offset, reloc->type, reloc->addend, reloc->last_entry);
          
-         rel_accessors[rel_seg_idx]->add_entry(segments[rel_seg_idx]->get_virtual_address() + rel_seg_offs, index, reloc->type, reloc->addend);
+         if (last_rela != rel_seg_idx)
+         {
+            if (rel_accessor != nullptr)
+               delete rel_accessor;
+            rel_accessor = new relocation_section_accessor(elf, add_relocation_section(elf, sections, dynsym_sec, rel_seg_idx));
+         }
+         rel_accessor->add_entry(segments[rel_seg_idx]->get_virtual_address() + rel_seg_offs, index, reloc->type, reloc->addend);
+         last_rela = rel_seg_idx;
          
          if (reloc->last_entry) break;
          reloc++;
@@ -302,9 +310,16 @@ int main(int argc, char **argv)
          int rel_seg_idx = reloc->seg_offset & 0xf;
          int rel_seg_offs = reloc->seg_offset >> 4;
          
-         printf("rel offset %x %x %x %x\n", reloc->seg_offset, reloc->type, reloc->addend, reloc->last_entry);
+         //printf("rel offset %x %x %x %x\n", reloc->seg_offset, reloc->type, reloc->addend, reloc->last_entry);
          
-         rel_accessors[rel_seg_idx]->add_entry(segments[rel_seg_idx]->get_virtual_address() + rel_seg_offs, index, reloc->type, reloc->addend);
+         if (last_rela != rel_seg_idx)
+         {
+            if (rel_accessor != nullptr)
+               delete rel_accessor;
+            rel_accessor = new relocation_section_accessor(elf, add_relocation_section(elf, sections, dynsym_sec, rel_seg_idx));
+         }
+         rel_accessor->add_entry(segments[rel_seg_idx]->get_virtual_address() + rel_seg_offs, index, reloc->type, reloc->addend);
+         last_rela = rel_seg_idx;
          
          if (reloc->last_entry) break;
          reloc++;
@@ -318,9 +333,16 @@ int main(int argc, char **argv)
       int rel_seg_offs = reloc->seg_offset >> 4;
       int ref_seg_idx = reloc->last_entry;
          
-      printf("rel static %x %x %x %x\n", reloc->seg_offset, reloc->type, reloc->addend, reloc->last_entry);
+      //printf("rel static %x %x %x %x\n", reloc->seg_offset, reloc->type, reloc->addend, reloc->last_entry);
 
-      rel_accessors[rel_seg_idx]->add_entry(segments[rel_seg_idx]->get_virtual_address() + rel_seg_offs, ref_seg_idx, reloc->type, segments[ref_seg_idx]->get_virtual_address() + reloc->addend);
+      if (last_rela != rel_seg_idx)
+      {
+         if (rel_accessor != nullptr)
+            delete rel_accessor;
+         rel_accessor = new relocation_section_accessor(elf, add_relocation_section(elf, sections, dynsym_sec, rel_seg_idx));
+      }
+      rel_accessor->add_entry(segments[rel_seg_idx]->get_virtual_address() + rel_seg_offs, ref_seg_idx, reloc->type, segments[ref_seg_idx]->get_virtual_address() + reloc->addend);
+      last_rela = rel_seg_idx;
    }
    
    elf.save(argv[2]);

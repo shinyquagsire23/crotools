@@ -706,8 +706,8 @@ class elfio
                 sec->set_offset( overlay->get_offset() + offset );
             }
 
-            seg->set_file_size( segment_filesize );
-            seg->set_memory_size( segment_memory );
+            //seg->set_file_size( segment_filesize );
+            //seg->set_memory_size( segment_memory );
             seg->set_offset( seg_start_pos );
         }
 
