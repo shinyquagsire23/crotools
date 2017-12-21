@@ -11,10 +11,14 @@ PHDRS {
 
 SECTIONS
 {
+   . = 0x180;
 	.text : ALIGN(0x4) {
 		build/crt0.o(.init)
 		*(.text)
+		*(.plt)
 	} : seg_text
+	
+	.got ALIGN(32) : { *(.got*) }  : seg_text
 	
 	.rodata : ALIGN(0x4) {
 		*(.rodata)
@@ -30,8 +34,6 @@ SECTIONS
 	.data : ALIGN(0x4) {
 		*(.data)
 	} : seg_data
-	
-	.got ALIGN(32) : { *(.got*) }  : seg_data
 	
 	.bss : ALIGN(0x4) {
 		*(.bss)
