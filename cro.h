@@ -166,6 +166,11 @@ typedef struct
       return (void*)((char*)cro_data + offs_data);
    }
    
+   void* get_segment_data(void* cro_data, int segment)
+   {
+      return (void*)((char*)cro_data + get_segments(cro_data)[segment].offset);
+   }
+
    CRO_Segment* get_segments(void* cro_data)
    {
       return (CRO_Segment*)((char*)cro_data + offs_segments);

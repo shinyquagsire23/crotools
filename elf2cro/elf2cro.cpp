@@ -214,7 +214,7 @@ int main(int argc, char **argv)
    for (int k = 0; k < elf.sections.size(); k++)
    {
       section* sec = elf.sections[k];
-      if (sec->get_type() != SHT_RELA) continue;
+      if (sec->get_type() != SHT_RELA && sec->get_type() != SHT_REL) continue;
       
       relocation_section_accessor rela(elf, sec);
       for (int i = 0; i < rela.get_entries_num(); i++)
@@ -271,7 +271,14 @@ int main(int argc, char **argv)
    cro_ctx.cro_header->offs_static_relocations = cro_ctx.cro_size;
    cro_ctx.cro_header->num_static_relocations = export_relocs_count;
    push_data(cro_ctx, NULL, sizeof(CRO_Relocation) * export_relocs_count);
-   
+
+   // Push data
+   segment_start[SEG_DATA] = cro_ctx.cro_size;
+   push_segment(cro_ctx, elf.segments[SEG_DATA]);
+   cro_ctx.cro_header->size_data = cro_ctx.cro_size - segment_start[SEG_DATA];
+   cro_align_up(cro_ctx, 0x1000, 0xCC);
+   segment_size[SEG_DATA] = cro_ctx.cro_size - segment_start[SEG_DATA];
+
    // Write import/export patches
    size_t import_reloc_count = 0;
    size_t static_reloc_count = 0;
@@ -283,7 +290,7 @@ int main(int argc, char **argv)
    for (int k = 0; k < elf.sections.size(); k++)
    {
       section* sec = elf.sections[k];
-      if (sec->get_type() != SHT_RELA || sec->get_type() != SHT_REL) continue;
+      if (sec->get_type() != SHT_RELA && sec->get_type() != SHT_REL) continue;
 
       relocation_section_accessor rela(elf, sec);
       for (int i = 0; i < rela.get_entries_num(); i++)
@@ -313,15 +320,52 @@ int main(int argc, char **argv)
             import_relocs[import_reloc_count++].addend = addend;
 
             last_import_symbol_idx = symbol_idx;
-            //printf("%x %x\n", last_import_symbol_idx, symbol_idx);
          }
          else
          {
+            int sym_seg = cro_addr_to_segment(elf, symbol.addr);
+            int sym_add = 0;
+            if (sym_seg == -1)
+               sym_seg = 0;
+            else
+               sym_add = symbol.addr - elf.segments[sym_seg]->get_virtual_address();
+            printf("%x %x %x\n", sym_seg, sym_add, symbol.addr);
+            
+            if (relType == 0x15)
+               relType = 2;
+               
+            if (relType == 0x17)
+            {
+               int offs_seg = cro_addr_to_segment(elf, offset);
+               int offs_addr = elf.segments[offs_seg]->get_virtual_address();
+               int offs_add = offset - offs_addr;
+               void* seg_data = cro_ctx.cro_header->get_segment_data(cro_ctx.cro_data, offs_seg);
+               
+               uint32_t val_to_change = *(uint32_t*)((char*)cro_ctx.cro_data + offs_addr + offs_add);
+               *(uint32_t*)((char*)cro_ctx.cro_data + elf.segments[offs_seg]->get_virtual_address() + offs_add) = 0;
+               
+               // Adjust the existing value and find the segment
+               offs_seg = cro_addr_to_segment(elf, val_to_change);
+               offs_addr = elf.segments[offs_seg]->get_virtual_address();
+               
+               val_to_change -= offs_addr;
+               addend += val_to_change;
+               sym_add = val_to_change;
+               sym_seg = offs_seg;
+               
+               printf("%x (seg %x) %x+%x %x\n", offset, offs_seg, offs_addr, offs_add, val_to_change);
+               
+               relType = 2;
+            }
+
             static_relocs[static_reloc_count].seg_offset = cro_addr_to_segment_addr(elf, offset);
             static_relocs[static_reloc_count].type = relType;
-            static_relocs[static_reloc_count].last_entry = symbol_idx;
-            static_relocs[static_reloc_count].addend = addend - elf.segments[symbol_idx]->get_virtual_address();
-
+            static_relocs[static_reloc_count].last_entry = sym_seg;
+            if (sec->get_type() == SHT_RELA)
+               static_relocs[static_reloc_count].addend = addend - symbol.addr;
+            else
+               static_relocs[static_reloc_count].addend = sym_add;
+            
             static_reloc_count++;
          }
       }
@@ -407,13 +451,6 @@ int main(int argc, char **argv)
       
       //printf("bit %x of byte %04x, %04x %04x \t\t(%s)\n", entry->test_bit, entry->test_byte, entry->left.raw, entry->right.raw, (char*)cro_ctx.cro_data + cro_ctx.cro_header->get_export(cro_ctx.cro_data, entry->export_index)->offs_name);
    }
-   
-   // Push data
-   segment_start[SEG_DATA] = cro_ctx.cro_size;
-   push_segment(cro_ctx, elf.segments[SEG_DATA]);
-   cro_ctx.cro_header->size_data = cro_ctx.cro_size - segment_start[SEG_DATA];
-   cro_align_up(cro_ctx, 0x1000, 0xCC);
-   segment_size[SEG_DATA] = cro_ctx.cro_size - segment_start[SEG_DATA];
    
    // Finalize
    cro_ctx.cro_header->offs_text = segment_start[SEG_TEXT];
