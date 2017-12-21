@@ -180,6 +180,7 @@ int main(int argc, char **argv)
       dynsym_sec->set_entry_size(elf.get_default_entry_size(SHT_SYMTAB));
 
       dynsym_sec->set_link(strtab_sec->get_index());
+      dynsym_sec->set_info(5+1);
       dynsym_sec->set_overlay(sections[SEG_TEXT]->get_index());
       dynsym_sec->set_addr_align(4);
    }
@@ -199,6 +200,7 @@ int main(int argc, char **argv)
       int seg_idx = symbol->seg_offset & 0xf;
       int seg_offs = symbol->seg_offset >> 4;
       //printf("%x - %x %x\n", symbol->seg_offset, seg_idx, seg_offs);
+      //printf("%s\n", (char*)cro_data + symbol->offs_name);
       
       symd.add_symbol(stra, (char*)cro_data + symbol->offs_name, segments[seg_idx]->get_virtual_address() + seg_offs, 0, STB_GLOBAL, STT_NOTYPE, 0, sections[seg_idx]->get_index());
    }
@@ -341,7 +343,7 @@ int main(int argc, char **argv)
             delete rel_accessor;
          rel_accessor = new relocation_section_accessor(elf, add_relocation_section(elf, sections, dynsym_sec, rel_seg_idx));
       }
-      rel_accessor->add_entry(segments[rel_seg_idx]->get_virtual_address() + rel_seg_offs, ref_seg_idx, reloc->type, segments[ref_seg_idx]->get_virtual_address() + reloc->addend);
+      rel_accessor->add_entry(segments[rel_seg_idx]->get_virtual_address() + rel_seg_offs, ref_seg_idx+1, reloc->type, segments[ref_seg_idx]->get_virtual_address() + reloc->addend);
       last_rela = rel_seg_idx;
    }
    
