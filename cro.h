@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 #define MAGIC_CRO0 (0x304F5243)
+#define CRO_TREE_END (0x8000)
 
 enum CRO_Segment_Type
 {
@@ -26,15 +27,22 @@ typedef struct
    uint32_t seg_offset;
 } CRO_Symbol;
 
+typedef union {
+   uint16_t raw;
+   struct
+   {
+      uint16_t next_index : 15;
+      uint16_t is_end : 1;
+   };
+} CRO_ExportTreeChild;
+
 typedef struct
 {
-   uint16_t test_bit;
-   union Child {
-      uint16_t raw;
-      uint16_t next_index;
-   } left, right;
+   uint16_t test_bit : 3;
+   uint16_t test_byte : 13;
+   CRO_ExportTreeChild left, right;
 
-   uint16_t exportIndex;
+   uint16_t export_index;
 } CRO_ExportTreeEntry;
 
 typedef struct
@@ -136,6 +144,11 @@ typedef struct
    CRO_Symbol* get_import(void* cro_data, int index)
    {
       return (CRO_Symbol*)((char*)cro_data + offs_symbol_imports + (index * sizeof(CRO_Symbol)));
+   }
+   
+   CRO_ExportTreeEntry* get_export_tree_entry(void* cro_data, int index)
+   {
+      return (CRO_ExportTreeEntry*)((char*)cro_data + offs_export_tree + (index * sizeof(CRO_ExportTreeEntry)));
    }
    
    char* get_name(void* cro_data)

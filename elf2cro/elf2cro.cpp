@@ -4,6 +4,7 @@
 #include "elfio/elfio.hpp"
 #include "elfio/elfio_dump.hpp"
 #include "cro.h"
+#include "bit_trie.h"
 
 #include <map>
 
@@ -312,7 +313,7 @@ int main(int argc, char **argv)
             import_relocs[import_reloc_count++].addend = addend;
 
             last_import_symbol_idx = symbol_idx;
-            printf("%x %x\n", last_import_symbol_idx, symbol_idx);
+            //printf("%x %x\n", last_import_symbol_idx, symbol_idx);
          }
          else
          {
@@ -341,7 +342,7 @@ int main(int argc, char **argv)
       
       if (symbol.section_index != 0 && symbol.name != "")
       {
-         printf("%s %x\n", symbol.name.c_str(), symbol.section_index);
+         //printf("%s %x\n", symbol.name.c_str(), symbol.section_index);
          exportSymbols[export_name_count].offs_name = export_name_offset;
          exportSymbols[export_name_count++].seg_offset = cro_addr_to_segment_addr(elf, symbol.addr);
          
@@ -360,13 +361,51 @@ int main(int argc, char **argv)
       }
       else if (symbol.section_index == 0 && symbol.name != "")
       {
-         printf("%s %x\n", symbol.name.c_str(), symbol.section_index);
+         //printf("%s %x\n", symbol.name.c_str(), symbol.section_index);
          importSymbols[import_name_count].offs_name = import_name_offset;
          importSymbols[import_name_count++].seg_offset = cro_ctx.cro_header->offs_import_patches + symbol_to_patches[i] * sizeof(CRO_Relocation);
          
          memcpy((char*)cro_ctx.cro_data + import_name_offset, symbol.name.c_str(), symbol.name.length()+1);
          import_name_offset += symbol.name.length()+1;
       }
+   }
+   
+   // Export Tree
+   std::vector<std::pair<std::string, int> > exportsAndIndexes;
+   for (int i = 0; i < export_name_count; i++)
+   {
+      char* expName = (char*)cro_ctx.cro_data + cro_ctx.cro_header->get_export(cro_ctx.cro_data, i)->offs_name;
+      std::string expNameStr(expName);
+      exportsAndIndexes.push_back(std::pair<std::string, int>(expNameStr, i));
+   }
+
+   std::size_t max_bit_length = 0;
+   for (const auto& pair : exportsAndIndexes)
+   {
+      if (pair.first.size() > max_bit_length)
+         max_bit_length = pair.first.size();
+   }
+   max_bit_length *= 8;
+
+   bit_trie<std::string, int, decltype(&string_tester)> example(exportsAndIndexes.begin(), exportsAndIndexes.end(), max_bit_length, &string_tester);
+
+   int treeCount = 0;
+   for (auto& node : example.nodes)
+   {
+      CRO_ExportTreeEntry* entry = cro_ctx.cro_header->get_export_tree_entry(cro_ctx.cro_data, treeCount);
+      
+      entry->test_bit = static_cast<uint16_t>(node.bit_address) % 8;
+      entry->test_byte = static_cast<uint16_t>(node.bit_address) / 8;
+      entry->left.next_index = node.left.offset + treeCount;
+      entry->left.is_end = node.left.end;
+      entry->right.next_index = node.right.offset + treeCount++;
+      entry->right.is_end = node.right.end;
+      entry->export_index = node.value;
+      
+      if (treeCount == 1)
+         entry->right.is_end = false;
+      
+      //printf("bit %x of byte %04x, %04x %04x \t\t(%s)\n", entry->test_bit, entry->test_byte, entry->left.raw, entry->right.raw, (char*)cro_ctx.cro_data + cro_ctx.cro_header->get_export(cro_ctx.cro_data, entry->export_index)->offs_name);
    }
    
    // Push data
