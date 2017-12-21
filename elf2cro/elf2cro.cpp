@@ -420,7 +420,8 @@ int main(int argc, char **argv)
    cro_ctx.cro_header->size_text = text_total_size;
    cro_ctx.cro_header->offs_data = segment_start[SEG_DATA];
    
-   cro_ctx.cro_header->size_bss = elf.sections[".bss"]->get_size();
+   if (elf.sections[".bss"] != nullptr)
+      cro_ctx.cro_header->size_bss = elf.sections[".bss"]->get_size();
 
    CRO_Segment* cro_segments = (CRO_Segment*)((char*)cro_ctx.cro_data + cro_ctx.cro_header->offs_segments);
    for (int i = 0; i < cro_ctx.cro_header->num_segments; i++)
