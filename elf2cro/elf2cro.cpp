@@ -283,7 +283,7 @@ int main(int argc, char **argv)
    for (int k = 0; k < elf.sections.size(); k++)
    {
       section* sec = elf.sections[k];
-      if (sec->get_type() != SHT_RELA) continue;
+      if (sec->get_type() != SHT_RELA || sec->get_type() != SHT_REL) continue;
 
       relocation_section_accessor rela(elf, sec);
       for (int i = 0; i < rela.get_entries_num(); i++)
