@@ -15,6 +15,7 @@ AS = arm-none-eabi-as
 OBJCOPY = arm-none-eabi-objcopy
 CFLAGS += -g -Wall -std=c99 -march=armv6 -O2 -I"$(CTRULIB)/include" -I$(DEVKITPRO)/libnds/include
 LDFLAGS += --script=ccd00.ld -shared -L"$(CTRULIB)/lib"
+ELF2CRO = ../elf2cro/elf2cro
 
 CFILES = $(wildcard source/*.c)
 BINFILES = $(wildcard data/*.bin)
@@ -38,13 +39,13 @@ endef
 
 .PHONY:=all dirs
 
-all: dirs $(PROJECTNAME).bin
+all: dirs $(PROJECTNAME).cro
 
 dirs:
 	@mkdir -p build
 
-$(PROJECTNAME).bin: $(PROJECTNAME).elf
-	$(OBJCOPY) -O binary $< $@
+$(PROJECTNAME).cro: $(PROJECTNAME).elf
+	@$(ELF2CRO) $(PROJECTNAME).elf $(PROJECTNAME).cro
 	
 
 $(PROJECTNAME).elf: $(OFILES)
