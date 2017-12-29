@@ -195,6 +195,27 @@ int main(int argc, char **argv)
                printf("Addend %x to %x\n", addend, new_addend);
             }
          }
+         else if (type == 0x17) // Relative -> absolute
+         {
+            int rel_seg_idx = addr_to_segment(elf_input, offset);
+            uint32_t seg_offs = new_offset - new_offsets[rel_seg_idx];
+            uint32_t orig_value = *(uint32_t*)(elf_out.sections[rel_seg_idx+2]->get_data() + seg_offs);
+            *(uint32_t*)(elf_out.sections[rel_seg_idx+2]->get_data() + seg_offs) = 0;
+            
+            int32_t relative_target_seg = addr_to_segment(elf_input, orig_value);
+            
+            if (relative_target_seg == -1 && orig_value == elf_input.segments[0]->get_virtual_address() + elf_input.segments[0]->get_file_size())
+            {
+               relative_target_seg = 0;
+            }
+            
+            printf("%x %x %x\n", new_offset, relative_target_seg, orig_value);
+            uint32_t relative_target = orig_value - elf_input.segments[relative_target_seg]->get_virtual_address() + new_offsets[relative_target_seg];
+            printf("relative %x %x %x\n", relative_target, seg_offs, relative_target_seg);
+            
+            ((Elf32_Rela*)sec->get_data())[i].r_info = ELF32_R_INFO(relative_target_seg+1, 2);
+            new_addend = relative_target;
+         }
          ((Elf32_Rela*)sec->get_data())[i].r_offset = new_offset;
          ((Elf32_Rela*)sec->get_data())[i].r_addend = new_addend;
          
@@ -346,9 +367,14 @@ int main(int argc, char **argv)
             uint32_t orig_value = *(uint32_t*)(elf_out.sections[rel_seg_idx+2]->get_data() + seg_offs);
             *(uint32_t*)(elf_out.sections[rel_seg_idx+2]->get_data() + seg_offs) = 0;
             
-            symbol_idx = rel_seg_idx+1;
+            //new_offsets[addr_to_segment(elf_inject, orig_value)] + inject_offsets[addr_to_segment(elf_inject, orig_value)]
+            uint32_t relative_target_seg = addr_to_segment(elf_inject, orig_value);
+            uint32_t relative_target = orig_value - elf_inject.segments[relative_target_seg]->get_virtual_address() + new_offsets[addr_to_segment(elf_inject, orig_value)] + inject_offsets[relative_target_seg];
+            printf("relative %x %x %x\n", relative_target, seg_offs, addr_to_segment(elf_inject, orig_value));
+            
+            symbol_idx = relative_target_seg+1;
             offset = new_addr;
-            addend = orig_value + inject_offsets[rel_seg_idx];
+            addend = relative_target;
             type = 0x2;
          }
 
