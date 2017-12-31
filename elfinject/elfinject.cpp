@@ -290,8 +290,10 @@ int main(int argc, char **argv)
       {
          printf("Adding %s %i\n", symbol.name.c_str(), addr_to_segment(elf_inject, symbol.addr));
          
-         uint32_t new_addr = symbol.addr + (symbol.addr ? inject_offsets[addr_to_segment(elf_inject, symbol.addr)] : 0);
-         
+         uint32_t new_addr = 0;
+         if (symbol.addr)
+            new_addr = symbol.addr + inject_offsets[addr_to_segment(elf_inject, symbol.addr)] - elf_inject.segments[addr_to_segment(elf_inject, symbol.addr)]->get_virtual_address() + new_offsets[addr_to_segment(elf_inject, symbol.addr)];
+
          int index = syma.add_symbol(stra, symbol.name.c_str(), new_addr, symbol.size, symbol.bind, symbol.type, symbol.other, symbol.section_index);
       }
    }
@@ -341,10 +343,15 @@ int main(int argc, char **argv)
          {
             offset = new_addr;
             symbol_idx = ELF_get_symbol_index_by_name(syma, symbol.name);
+            
+            uint32_t seg_offs = new_addr - new_offsets[rel_seg_idx];
+            uint32_t orig_value = *(uint32_t*)(elf_out.sections[rel_seg_idx+2]->get_data() + seg_offs);
+            *(uint32_t*)(elf_out.sections[rel_seg_idx+2]->get_data() + seg_offs) = 0;
+
+            type = 0x2;
          }
          else if (type == 0x2 || type == 0x16) // ABS32
          {
-            
             offset = new_addr;
             if (symbol.name == "") // Just some generic relocation
             {
@@ -353,7 +360,7 @@ int main(int argc, char **argv)
             }
             else // We're importing functions from the ELF being injected into, adjust
             {
-               symbol_idx = rel_seg_idx+1;
+               symbol_idx = addr_to_segment(elf_out, symbol_real.addr)+1;
                addend += symbol_real.addr;
                type = 0x2;
                
