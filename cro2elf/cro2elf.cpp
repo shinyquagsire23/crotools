@@ -28,7 +28,7 @@ int main(int argc, char **argv)
 {
    if (argc < 3)
    {
-      printf("Usage: %s <input.cro> <output.elf>\n", argv[0]);
+      printf("Usage: %s <input.cro> <output.elf> [code.bin]\n", argv[0]);
       return -1;
    }
    
@@ -37,6 +37,29 @@ int main(int argc, char **argv)
    {
       printf("Failed to open file %s! Exiting...\n", argv[1]);
       return -1;
+   }
+   
+   bool is_static = false;
+   FILE* static_file;
+   void* static_data = nullptr;
+   uint32_t static_size = 0;
+   if (argc > 3)
+   {
+      static_file = fopen(argv[3], "rb");
+      if (!static_file)
+      {
+         printf("Failed to open file %s! Exiting...\n", argv[2]);
+         return -1;
+      }
+      
+      is_static = true;
+      fseek(static_file, 0, SEEK_END);
+      static_size = ftell(static_file);
+      static_data = malloc(static_size);
+      
+      fseek(static_file, 0, SEEK_SET);
+      fread(static_data, sizeof(uint8_t), static_size, static_file);
+      fclose(static_file);
    }
    
    fseek(cro_file, 0, SEEK_END);
@@ -149,7 +172,13 @@ int main(int argc, char **argv)
       if (cro_segments[i].type != SEG_BSS)
       {
          sec->set_address(cro_segments[i].offset);
-         sec->set_data((char*)cro_data + cro_segments[i].offset, cro_segments[i].size);
+         if (is_static)
+         {
+            if (i < 4)
+               sec->set_data((char*)static_data + cro_segments[i].offset - 0x100000, cro_segments[i].size);
+         }
+         else
+            sec->set_data((char*)cro_data + cro_segments[i].offset, cro_segments[i].size);
       }
       else
       {
