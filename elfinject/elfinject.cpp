@@ -162,7 +162,7 @@ int main(int argc, char **argv)
       
       uint32_t new_addr = symbol.addr - elf_input.segments[addr_to_segment(elf_input, symbol.addr)]->get_physical_address() + new_offsets[addr_to_segment(elf_input, symbol.addr)];
       
-      printf("%s old %x new %x\n", symbol.name.c_str(), symbol.addr, new_addr);
+      //printf("%s old %x new %x\n", symbol.name.c_str(), symbol.addr, new_addr);
       ((Elf32_Sym*)elf_out.sections[".dynsym"]->get_data())[i].st_value = new_addr;
    }
    
@@ -192,7 +192,7 @@ int main(int argc, char **argv)
             if (addr_to_segment(elf_input, addend) != -1)
             {
                new_addend = addend - elf_input.segments[addr_to_segment(elf_input, addend)]->get_physical_address() + new_offsets[addr_to_segment(elf_input, addend)];
-               printf("Addend %x to %x\n", addend, new_addend);
+               //printf("Addend %x to %x\n", addend, new_addend);
             }
          }
          else if (type == 0x17) // Relative -> absolute
@@ -209,9 +209,9 @@ int main(int argc, char **argv)
                relative_target_seg = 0;
             }
             
-            printf("%x %x %x\n", new_offset, relative_target_seg, orig_value);
+            //printf("%x %x %x\n", new_offset, relative_target_seg, orig_value);
             uint32_t relative_target = orig_value - elf_input.segments[relative_target_seg]->get_virtual_address() + new_offsets[relative_target_seg];
-            printf("relative %x %x %x\n", relative_target, seg_offs, relative_target_seg);
+            //printf("relative %x %x %x\n", relative_target, seg_offs, relative_target_seg);
             
             ((Elf32_Rela*)sec->get_data())[i].r_info = ELF32_R_INFO(relative_target_seg+1, 2);
             new_addend = relative_target;
@@ -219,8 +219,8 @@ int main(int argc, char **argv)
          ((Elf32_Rela*)sec->get_data())[i].r_offset = new_offset;
          ((Elf32_Rela*)sec->get_data())[i].r_addend = new_addend;
          
-         if (offset != new_offset)
-            printf("old %x new %x\n", offset, new_offset);
+         /*if (offset != new_offset)
+            printf("old %x new %x\n", offset, new_offset);*/
       }
    }
    
@@ -238,7 +238,7 @@ int main(int argc, char **argv)
          memcpy(not_orig, symbol.name.c_str(), strlen(symbol.name.c_str()) - strlen("_orig"));
          if (ELF_get_symbol_index_by_name(syma, std::string(not_orig)) != -1)
          {
-            printf("Ignore\n");
+            //printf("Ignore\n");
             continue;
          }
          
@@ -306,7 +306,7 @@ int main(int argc, char **argv)
       section* sec = elf_inject.sections[k];
       if (sec->get_type() != SHT_RELA && sec->get_type() != SHT_REL) continue;
       
-      printf("%s %x\n", sec->get_name().c_str(), sec->get_info());
+      //printf("%s %x\n", sec->get_name().c_str(), sec->get_info());
       
       int rel_seg_idx = -1;
       int last_rela = -1;
@@ -330,7 +330,7 @@ int main(int argc, char **argv)
          uint32_t new_addr = offset + (offset ? inject_offsets[rel_seg_idx] : 0);
          uint32_t new_sym_addr = symbol.addr + (symbol.addr ? inject_offsets[rel_seg_idx] : 0);
          uint32_t new_offset = new_sym_addr - new_offsets[rel_seg_idx];
-         printf("%s %x %x->%x %i %x\n", symbol.name.c_str(), offset, offset, new_addr, rel_seg_idx, symbol_real.addr);
+         //printf("%s %x %x->%x %i %x\n", symbol.name.c_str(), offset, offset, new_addr, rel_seg_idx, symbol_real.addr);
          
          if (last_rela != rel_seg_idx)
          {
@@ -377,7 +377,7 @@ int main(int argc, char **argv)
             //new_offsets[addr_to_segment(elf_inject, orig_value)] + inject_offsets[addr_to_segment(elf_inject, orig_value)]
             uint32_t relative_target_seg = addr_to_segment(elf_inject, orig_value);
             uint32_t relative_target = orig_value - elf_inject.segments[relative_target_seg]->get_virtual_address() + new_offsets[addr_to_segment(elf_inject, orig_value)] + inject_offsets[relative_target_seg];
-            printf("relative %x %x %x\n", relative_target, seg_offs, addr_to_segment(elf_inject, orig_value));
+            //printf("relative %x %x %x\n", relative_target, seg_offs, addr_to_segment(elf_inject, orig_value));
             
             symbol_idx = relative_target_seg+1;
             offset = new_addr;

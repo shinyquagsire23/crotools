@@ -329,7 +329,7 @@ int main(int argc, char **argv)
                sym_seg = 0;
             else
                sym_add = symbol.addr - elf.segments[sym_seg]->get_virtual_address();
-            printf("%x %x %x\n", sym_seg, sym_add, symbol.addr);
+            //printf("%x %x %x\n", sym_seg, sym_add, symbol.addr);
             
             if (relType == 0x15)
                relType = 2;
@@ -353,7 +353,7 @@ int main(int argc, char **argv)
                sym_add = val_to_change;
                sym_seg = offs_seg;
                
-               printf("%x (seg %x) %x+%x %x\n", offset, offs_seg, offs_addr, offs_add, val_to_change);
+               //printf("%x (seg %x) %x+%x %x\n", offset, offs_seg, offs_addr, offs_add, val_to_change);
                
                relType = 2;
             }
