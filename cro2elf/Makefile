@@ -4,7 +4,7 @@ OBJS = $(foreach dir,$(SRC_DIR),$(subst .c,.o,$(wildcard $(dir)/*.c))) $(foreach
 
 # Compiler Settings
 OUTPUT = cro2elf
-CXXFLAGS = -g -I. -I..
+CXXFLAGS = -std=c++11 -g -I. -I..
 CFLAGS = -g -O2 -flto -Wall -Wno-unused-variable  -Wno-unused-result -Wno-unused-local-typedefs -I. -std=c11
 CC = gcc
 CXX = g++
