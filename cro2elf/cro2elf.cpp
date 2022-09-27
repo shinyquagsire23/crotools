@@ -76,7 +76,7 @@ int main(int argc, char **argv)
    elfio elf;
    elf.create(ELFCLASS32, ELFDATA2LSB);
    elf.set_os_abi(ELFOSABI_NONE);
-   elf.set_type(ET_DYN);
+   elf.set_type(ET_REL);
    elf.set_machine(EM_ARM);
    elf.set_entry(cro_header->offs_text);
    
@@ -377,4 +377,6 @@ int main(int argc, char **argv)
    }
    
    elf.save(argv[2]);
+
+   return 0;
 }
