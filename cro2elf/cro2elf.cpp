@@ -241,8 +241,8 @@ int main(int argc, char **argv)
       int seg_offs = symbol->seg_offset >> 4;
       //printf("index %x - %x %x\n", symbol->seg_offset, seg_idx, seg_offs);
       
-      char name[32];
-      snprintf(name, 32, "export_index_%u", symbol->offs_name);
+      char name[256];
+      snprintf(name, 256, "export_index_%u", symbol->offs_name);
       symd.add_symbol(stra, name, segments[seg_idx]->get_virtual_address() + seg_offs, 0, STB_GLOBAL, STT_NOTYPE, 0, sections[seg_idx]->get_index());
    }
    
@@ -253,8 +253,8 @@ int main(int argc, char **argv)
       int seg_offs = symbol->seg_offset >> 4;
       //printf("index %x - %x %x\n", symbol->seg_offset, seg_idx, seg_offs);
       
-      char name[32];
-      snprintf(name, 32, "import_index_%u", symbol->offs_name);
+      char name[256];
+      snprintf(name, 256, "import_index_%u", symbol->offs_name);
       symd.add_symbol(stra, name, segments[seg_idx]->get_virtual_address() + seg_offs, 0, STB_GLOBAL, STT_NOTYPE, 0, sections[seg_idx]->get_index());
    }
    
@@ -289,13 +289,17 @@ int main(int argc, char **argv)
       }
    }
    
+   int module_count = 0;
+   int remaining_in_module = cro_header->get_module_entry(cro_data, module_count)->import_indexed_symbol_num;
    for (int i = 0; i < cro_header->num_index_imports; i++)
    {
+      CRO_ModuleEntry* module = cro_header->get_module_entry(cro_data, module_count);
+
       CRO_Symbol* symbol = cro_header->get_index_import(cro_data, i);
       uint32_t patch_offs = symbol->seg_offset;
       
-      char name[32];
-      snprintf(name, 32, "import_index_%u", symbol->offs_name);
+      char name[256];
+      snprintf(name, 256, "import_index_%s_%u", module->get_name(cro_data), symbol->offs_name);
       int index = symd.add_symbol(stra, name, 0x0, 0, STB_GLOBAL, STT_NOTYPE, 0, 0);
       
       if (!patch_offs) continue;
@@ -320,17 +324,27 @@ int main(int argc, char **argv)
          if (reloc->last_entry) break;
          reloc++;
       }
+
+      remaining_in_module -= 1;
+      if (remaining_in_module <= 0) {
+         module_count++;
+         remaining_in_module = cro_header->get_module_entry(cro_data, module_count)->import_indexed_symbol_num;
+      }
    }
    
+   module_count = 0;
+   remaining_in_module = cro_header->get_module_entry(cro_data, module_count)->import_anonymous_symbol_num;
    for (int i = 0; i < cro_header->num_offset_imports; i++)
    {
+      CRO_ModuleEntry* module = cro_header->get_module_entry(cro_data, module_count);
+
       CRO_Symbol* symbol = cro_header->get_offset_import(cro_data, i);
       uint32_t patch_offs = symbol->seg_offset;
       int seg_idx = symbol->offs_name & 0xf;
       int seg_offs = symbol->offs_name >> 4;
       
-      char name[32];
-      snprintf(name, 32, "offset_import_%x_%x", seg_idx, seg_offs);
+      char name[256];
+      snprintf(name, 256, "offset_import_%s_%x_%x", module->get_name(cro_data), seg_idx, seg_offs);
       int index = symd.add_symbol(stra, name, 0x0, 0, STB_GLOBAL, STT_NOTYPE, 0, 0);
       
       if (!patch_offs) continue;
@@ -354,6 +368,12 @@ int main(int argc, char **argv)
          
          if (reloc->last_entry) break;
          reloc++;
+      }
+
+      remaining_in_module -= 1;
+      if (remaining_in_module <= 0) {
+         module_count++;
+         remaining_in_module = cro_header->get_module_entry(cro_data, module_count)->import_anonymous_symbol_num;
       }
    }
 

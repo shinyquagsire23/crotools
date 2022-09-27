@@ -55,6 +55,22 @@ typedef struct
    uint32_t addend;
 } CRO_Relocation;
 
+typedef struct  {
+   uint32_t offs_mod_name;
+   uint32_t import_indexed_symbol_table_offset; // pointing to a subtable in
+                                             // ImportIndexedSymbolTable
+   uint32_t import_indexed_symbol_num;
+   uint32_t import_anonymous_symbol_table_offset; // pointing to a subtable in
+                                               // ImportAnonymousSymbolTable
+   uint32_t import_anonymous_symbol_num;
+
+   char* get_name(void* cro_data)
+   {
+      return (char*)cro_data + offs_mod_name;
+   }
+
+} CRO_ModuleEntry;
+
 typedef struct
 {
    uint8_t hash_table[0x80];
@@ -149,6 +165,11 @@ typedef struct
    CRO_ExportTreeEntry* get_export_tree_entry(void* cro_data, int index)
    {
       return (CRO_ExportTreeEntry*)((char*)cro_data + offs_export_tree + (index * sizeof(CRO_ExportTreeEntry)));
+   }
+
+   CRO_ModuleEntry* get_module_entry(void* cro_data, int index)
+   {
+      return (CRO_ModuleEntry*)((char*)cro_data + offs_import_module + (index * sizeof(CRO_ModuleEntry)));
    }
    
    char* get_name(void* cro_data)
